@@ -1,0 +1,13 @@
+//! carrlink is a library for interfacing with a Carrera control unit either
+//! using a bluetooth connector or a direct serial connection.
+
+mod backend_ble;
+mod control_unit;
+mod error;
+mod messages;
+mod status;
+
+pub use backend_ble::{discover_first_ble, BackendBLE};
+pub use control_unit::ControlUnit;
+pub use error::Error;
+pub use status::{LapStatus, StartSignal, Status, TrackStatus, MAX_CONTROLLER_COUNT};

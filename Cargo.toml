@@ -1,0 +1,15 @@
+[package]
+name = "carrlink"
+version = "0.1.0"
+edition = "2021"
+description = "Library for interfacing with the Carrera control unit."
+authors = ["Fabian Meyer <rookfighter@posteo.org>"]
+readme = "README.md"
+repository = "https://github.com/Rookfighter/carrlink"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+btleplug = {"version"= "0.11.1"}
+futures = "0.3.29"
+uuid = "1.5.0"
