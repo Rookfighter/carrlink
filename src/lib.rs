@@ -11,3 +11,6 @@ pub use backend_ble::{discover_first_ble, BackendBLE};
 pub use control_unit::ControlUnit;
 pub use error::Error;
 pub use status::{LapStatus, StartSignal, Status, TrackStatus, MAX_CONTROLLER_COUNT};
+
+/// Convenience type for a result using the carrlink [`Error`] type.
+pub type Result<T> = std::result::Result<T, Error>;

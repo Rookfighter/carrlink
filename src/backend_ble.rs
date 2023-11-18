@@ -164,8 +164,14 @@ async fn is_control_unit(peripheral: &Peripheral) -> btleplug::Result<bool> {
     }
 }
 
+pub async fn discover_first_ble(adapter: &Adapter) -> crate::Result<Option<ControlUnit>> {
+    discover_first_ble_internal(&adapter)
+        .await
+        .map_err(convert_btleplug_error)
+}
+
 /// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
-pub async fn discover_first_ble(adapter: &Adapter) -> btleplug::Result<Option<ControlUnit>> {
+async fn discover_first_ble_internal(adapter: &Adapter) -> btleplug::Result<Option<ControlUnit>> {
     adapter.start_scan(ScanFilter::default()).await?;
     let mut events = adapter.events().await?;
 
