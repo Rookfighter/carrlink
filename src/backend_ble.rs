@@ -8,6 +8,8 @@ use btleplug::platform::{Adapter, Peripheral};
 use futures::stream::StreamExt;
 use uuid::{uuid, Uuid};
 
+use crate::ControlUnit;
+
 use super::Error;
 
 // const SERVICE_UUID: Uuid = uuid!("39df7777-b1b4-b90b-57f1-7144ae4e4a6a");
@@ -42,11 +44,19 @@ fn convert_btleplug_error(error: btleplug::Error) -> Error {
 pub struct BackendBLE {
     peripheral: Peripheral,
     is_subscribed: bool,
-    notify_char: Characteristic,
-    output_char: Characteristic,
+    notify_char: Option<Characteristic>,
+    output_char: Option<Characteristic>,
 }
 
 impl BackendBLE {
+    pub fn new(peripheral: Peripheral) -> BackendBLE {
+        BackendBLE {
+            peripheral,
+            is_subscribed: false,
+            notify_char: None,
+            output_char: None,
+        }
+    }
     /// Connects the backend with the configured peripheral.
     pub async fn connect(&mut self) -> Result<(), Error> {
         self.connect_internal()
@@ -83,20 +93,26 @@ impl BackendBLE {
 
         let chars = self.peripheral.characteristics();
 
-        self.notify_char = match chars.iter().find(|c| c.uuid == NOTIFY_UUID) {
-            Some(c) => Ok(c),
-            None => Err(btleplug::Error::NoSuchCharacteristic),
-        }?
-        .clone();
+        self.notify_char = Some(
+            match chars.iter().find(|c| c.uuid == NOTIFY_UUID) {
+                Some(c) => Ok(c),
+                None => Err(btleplug::Error::NoSuchCharacteristic),
+            }?
+            .clone(),
+        );
 
-        self.output_char = match chars.iter().find(|c| c.uuid == OUTPUT_UUID) {
-            Some(c) => Ok(c),
-            None => Err(btleplug::Error::NoSuchCharacteristic),
-        }?
-        .clone();
+        self.output_char = Some(
+            match chars.iter().find(|c| c.uuid == OUTPUT_UUID) {
+                Some(c) => Ok(c),
+                None => Err(btleplug::Error::NoSuchCharacteristic),
+            }?
+            .clone(),
+        );
 
         if !self.is_subscribed {
-            self.peripheral.subscribe(&self.notify_char).await?;
+            self.peripheral
+                .subscribe(&self.notify_char.as_ref().unwrap())
+                .await?;
             self.is_subscribed = true;
         }
 
@@ -105,7 +121,10 @@ impl BackendBLE {
 
     async fn disconnect_internal(&mut self) -> Result<(), btleplug::Error> {
         if self.is_subscribed {
-            self.peripheral.unsubscribe(&self.notify_char).await?;
+            match self.notify_char.as_ref() {
+                Some(value) => self.peripheral.unsubscribe(&value).await?,
+                None => (),
+            }
             self.is_subscribed = false;
         }
 
@@ -117,8 +136,13 @@ impl BackendBLE {
     }
 
     async fn request_internal(&mut self, data: &[u8]) -> Result<Vec<u8>, btleplug::Error> {
+        let char = match self.output_char.as_mut() {
+            Some(char) => Ok(char),
+            None => Err(btleplug::Error::NotConnected),
+        }?;
+
         self.peripheral
-            .write(&self.output_char, data, WriteType::WithResponse)
+            .write(&char, data, WriteType::WithResponse)
             .await?;
 
         let mut notify_stream = self.peripheral.notifications().await?.take(1);
@@ -141,7 +165,7 @@ async fn is_control_unit(peripheral: &Peripheral) -> btleplug::Result<bool> {
 }
 
 /// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
-pub async fn discover_first_ble(adapter: &Adapter) -> btleplug::Result<Option<Peripheral>> {
+pub async fn discover_first_ble(adapter: &Adapter) -> btleplug::Result<Option<ControlUnit>> {
     adapter.start_scan(ScanFilter::default()).await?;
     let mut events = adapter.events().await?;
 
@@ -151,7 +175,7 @@ pub async fn discover_first_ble(adapter: &Adapter) -> btleplug::Result<Option<Pe
                 let peripheral = adapter.add_peripheral(&id).await?;
                 if is_control_unit(&peripheral).await? {
                     adapter.stop_scan().await?;
-                    return Ok(Some(peripheral));
+                    return Ok(Some(ControlUnit::new(BackendBLE::new(peripheral))));
                 }
             }
             _ => continue,

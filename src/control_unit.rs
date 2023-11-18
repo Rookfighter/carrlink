@@ -29,6 +29,9 @@ const BUTTON_FUEL: u8 = 7;
 const BUTTON_CODE: u8 = 8;
 
 impl ControlUnit {
+    pub fn new(backend: BackendBLE) -> ControlUnit {
+        ControlUnit { backend: backend }
+    }
     /// Connects the control unit with the configured backend.
     pub async fn connect(&mut self) -> Result<(), Error> {
         self.backend.connect().await
