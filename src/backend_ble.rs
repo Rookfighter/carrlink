@@ -1,6 +1,7 @@
 //! Module which implements a bluetooth low energy backend with routines for
 //! connecting, disconnecting and sending requests.
 
+use crate::ControlUnit;
 use btleplug::api::{
     Central as _, CentralEvent, Characteristic, Peripheral as _, ScanFilter, WriteType,
 };
@@ -8,36 +9,22 @@ use btleplug::platform::{Adapter, Peripheral};
 use futures::stream::StreamExt;
 use uuid::{uuid, Uuid};
 
-use crate::ControlUnit;
-
-use super::Error;
-
 // const SERVICE_UUID: Uuid = uuid!("39df7777-b1b4-b90b-57f1-7144ae4e4a6a");
 const NOTIFY_UUID: Uuid = uuid!("39df9999-b1b4-b90b-57f1-7144ae4e4a6a");
 const OUTPUT_UUID: Uuid = uuid!("39df8888-b1b4-b90b-57f1-7144ae4e4a6a");
 
-fn convert_btleplug_error(error: btleplug::Error) -> Error {
-    match error {
-        btleplug::Error::DeviceNotFound => Error::DeviceNotFound,
-        btleplug::Error::PermissionDenied => Error::PermissionDenied,
-        btleplug::Error::NotConnected => Error::NotConnected,
-        btleplug::Error::UnexpectedCallback => {
-            Error::RuntimeError("btleplug::UnexpectedCallback".to_owned())
+impl From<btleplug::Error> for crate::Error {
+    fn from(value: btleplug::Error) -> Self {
+        match value {
+            btleplug::Error::DeviceNotFound => crate::Error::DeviceNotFound,
+            btleplug::Error::PermissionDenied => crate::Error::PermissionDenied,
+            btleplug::Error::NotConnected => crate::Error::NotConnected,
+            btleplug::Error::Other(contained) => crate::Error::Other(contained),
+            btleplug::Error::NotSupported(msg) => crate::Error::NotSupported(msg),
+            btleplug::Error::TimedOut(duration) => crate::Error::TimedOut(duration),
+            btleplug::Error::RuntimeError(msg) => crate::Error::RuntimeError(msg),
+            _ => crate::Error::Other(Box::new(value)),
         }
-        btleplug::Error::UnexpectedCharacteristic => {
-            Error::RuntimeError("btleplug::UnexpectedCharacteristic".to_owned())
-        }
-        btleplug::Error::NoSuchCharacteristic => {
-            Error::RuntimeError("btleplug::NoSuchCharacteristic".to_owned())
-        }
-        btleplug::Error::NotSupported(msg) => Error::NotSupported(msg),
-        btleplug::Error::TimedOut(duration) => Error::TimedOut(duration),
-        btleplug::Error::Uuid(_) => Error::RuntimeError("btleplug::UUID".to_owned()),
-        btleplug::Error::InvalidBDAddr(_) => {
-            Error::RuntimeError("btleplug::InvalidBDAddr".to_owned())
-        }
-        btleplug::Error::RuntimeError(msg) => Error::RuntimeError(msg),
-        btleplug::Error::Other(_) => Error::Other,
     }
 }
 
@@ -58,33 +45,23 @@ impl BackendBLE {
         }
     }
     /// Connects the backend with the configured peripheral.
-    pub async fn connect(&mut self) -> Result<(), Error> {
-        self.connect_internal()
-            .await
-            .map_err(convert_btleplug_error)
+    pub async fn connect(&mut self) -> crate::Result<()> {
+        Ok(self.connect_internal().await?)
     }
 
-    pub async fn disconnect(&mut self) -> Result<(), Error> {
-        self.disconnect_internal()
-            .await
-            .map_err(convert_btleplug_error)
+    pub async fn disconnect(&mut self) -> crate::Result<()> {
+        Ok(self.disconnect_internal().await?)
     }
 
-    pub async fn request(&mut self, data: &[u8]) -> Result<Vec<u8>, Error> {
-        self.request_internal(data)
-            .await
-            .map_err(convert_btleplug_error)
+    pub async fn request(&mut self, data: &[u8]) -> crate::Result<Vec<u8>> {
+        Ok(self.request_internal(data).await?)
     }
 
-    pub async fn is_connected(&self) -> Result<bool, Error> {
-        self.peripheral
-            .is_connected()
-            .await
-            .map(|is_connected| is_connected && self.is_subscribed)
-            .map_err(convert_btleplug_error)
+    pub async fn is_connected(&self) -> crate::Result<bool> {
+        Ok(self.peripheral.is_connected().await? && self.is_subscribed)
     }
 
-    async fn connect_internal(&mut self) -> Result<(), btleplug::Error> {
+    async fn connect_internal(&mut self) -> btleplug::Result<()> {
         if !self.peripheral.is_connected().await? {
             self.peripheral.connect().await?;
 
@@ -119,7 +96,7 @@ impl BackendBLE {
         Ok(())
     }
 
-    async fn disconnect_internal(&mut self) -> Result<(), btleplug::Error> {
+    async fn disconnect_internal(&mut self) -> btleplug::Result<()> {
         if self.is_subscribed {
             match self.notify_char.as_ref() {
                 Some(value) => self.peripheral.unsubscribe(&value).await?,
@@ -135,7 +112,7 @@ impl BackendBLE {
         Ok(())
     }
 
-    async fn request_internal(&mut self, data: &[u8]) -> Result<Vec<u8>, btleplug::Error> {
+    async fn request_internal(&mut self, data: &[u8]) -> btleplug::Result<Vec<u8>> {
         let char = match self.output_char.as_mut() {
             Some(char) => Ok(char),
             None => Err(btleplug::Error::NotConnected),
@@ -165,9 +142,7 @@ async fn is_control_unit(peripheral: &Peripheral) -> btleplug::Result<bool> {
 }
 
 pub async fn discover_first_ble(adapter: &Adapter) -> crate::Result<Option<ControlUnit>> {
-    discover_first_ble_internal(&adapter)
-        .await
-        .map_err(convert_btleplug_error)
+    Ok(discover_first_ble_internal(&adapter).await?)
 }
 
 /// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
