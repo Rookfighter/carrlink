@@ -2,6 +2,7 @@ use std::time::Duration;
 
 /// Status of the lap of a specific controller.
 /// Contains the sector and time of the controller.
+#[derive(Debug)]
 pub struct LapStatus {
     /// Identifier of the controller.
     /// Range is typically [0, 8].
@@ -29,6 +30,7 @@ impl LapStatus {
 pub const MAX_CONTROLLER_COUNT: usize = 8;
 
 /// Start signal which is emitted by the track
+#[derive(Debug)]
 pub enum StartSignal {
     None = 0,
     Five = 2,
@@ -56,6 +58,7 @@ impl TryFrom<u8> for StartSignal {
     }
 }
 
+#[derive(Debug)]
 pub struct TrackStatus {
     /// The fuel level of each controller.
     /// Values are in range [0,15].
@@ -99,6 +102,7 @@ impl TrackStatus {
 
 /// Status message that can be returned by the control unit.
 /// Either contains a lap status or a track status.
+#[derive(Debug)]
 pub enum Status {
     Lap(LapStatus),
     Track(TrackStatus),

@@ -11,8 +11,8 @@ pub const VERSION_REQUEST: [u8; 1] = [b'0'];
 
 /// Computes the checksum of the given slice of data.
 fn compute_checksum(data: &[u8]) -> u8 {
-    let sum: u8 = data.iter().sum();
-    sum & 0x0F
+    let sum: u32 = data.iter().map(|c| *c as u32).sum();
+    (sum & 0x0F) as u8
 }
 
 /// Verifies if the given data slice has a valid checksum.
@@ -22,7 +22,8 @@ fn check_checksum(data: &[u8]) -> bool {
     }
 
     let expected = compute_checksum(&data[1..data.len() - 1]);
-    data[data.len() - 1] == expected
+    let actual = data.last().unwrap() & 0x0F;
+    actual == expected
 }
 
 const UINT32_SIZE: usize = 8;
@@ -149,6 +150,7 @@ pub fn decode_status(data: &[u8]) -> Option<Status> {
 
 pub fn decode_version(data: &[u8]) -> Option<String> {
     const RESPONSE_SIZE: usize = 6;
+
     if data.len() != RESPONSE_SIZE {
         return None;
     }
