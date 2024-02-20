@@ -28,7 +28,7 @@ async fn find_control_unit(adapter: Adapter) -> carrlink::Result<ControlUnit> {
 async fn main() -> io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 3 {
-        println!("usage: set_speed <player> <level>");
+        println!("usage: set_brake <player> <level>");
         return Ok(());
     }
 
@@ -47,8 +47,8 @@ async fn main() -> io::Result<()> {
 
     let player = args[1].parse::<usize>().unwrap();
     let level = args[2].parse::<usize>().unwrap();
-    println!("Set speed of player #{} to {}", player, level);
-    control_unit.set_speed_level(player, level).await.unwrap();
+    println!("Set brake of player #{} to {}", player, level);
+    control_unit.set_brake_level(player, level).await.unwrap();
 
     println!("Disconnect from control unit");
     control_unit.disconnect().await.unwrap();
