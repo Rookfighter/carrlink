@@ -48,10 +48,10 @@ const fn encode_nibble(value: u8) -> u8 {
 }
 
 /// Encodes the address of the player for writing a word.
-const fn encode_player_address(address_offset: u8, player: u8) -> u8 {
-    let player_validity_mask: u8 = 0x07;
-    let address_validity_mask: u8 = 0x1F;
-    ((player & player_validity_mask) << 5) | (address_offset & address_validity_mask)
+const fn encode_player_address(offset: u8, player: u8) -> u8 {
+    let player_mask: u8 = 0x07;
+    let offset_mask: u8 = 0x1F;
+    ((player & player_mask) << 5) | (offset & offset_mask)
 }
 
 fn decode_track_status(data: &[u8]) -> Option<TrackStatus> {
@@ -184,8 +184,8 @@ pub fn make_button_press_request(button: u8) -> [u8; 3] {
 fn make_set_word_request(address: u8, value: u8, repetitions: u8) -> [u8; 6] {
     let mut result: [u8; 6] = [
         b'J',
-        address & 0x0F,
-        address >> 4,
+        VALUE_BASE + (address & 0x0F),
+        VALUE_BASE + (address >> 4),
         encode_nibble(value),
         encode_nibble(repetitions),
         0,
