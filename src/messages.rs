@@ -44,7 +44,7 @@ const VALUE_BASE: u8 = b'0';
 
 /// Encodes the lower nibble of the given value onto the buffer.
 const fn encode_nibble(value: u8) -> u8 {
-    VALUE_BASE + value & 0x0F
+    VALUE_BASE + (value & 0x0F)
 }
 
 /// Encodes the address of the player for writing a word.

@@ -42,13 +42,23 @@ async fn main() -> io::Result<()> {
     control_unit.connect().await.unwrap();
 
     loop {
-        println!("Fetch status");
-        match control_unit.get_status().await {
-            Ok(status) => println!("{:?}", status),
-            Err(error) => println!("error: {}", error),
+        println!("Button (enter / countdown / esc / brake / speed / fuel / code / exit");
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+
+        match &answer[..answer.len()-1] {
+            "enter"=> control_unit.press_enter().await.unwrap(),
+            "countdown"=> { control_unit.press_enter().await.unwrap(); control_unit.press_enter().await.unwrap()},
+            "esc"=> control_unit.press_esc().await.unwrap(),
+            "speed"=> control_unit.press_speed().await.unwrap(),
+            "brake"=> control_unit.press_brake().await.unwrap(),
+            "fuel"=> control_unit.press_fuel().await.unwrap(),
+            "code"=> control_unit.press_code().await.unwrap(),
+            "exit"=> break,
+            _ => println!("Invalid command: {}", answer),
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 
     Ok(())
 }
+

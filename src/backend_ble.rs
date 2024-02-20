@@ -67,8 +67,9 @@ impl BackendBLE {
     async fn connect_internal(&mut self) -> btleplug::Result<()> {
         if !self.peripheral.is_connected().await? {
             self.peripheral.connect().await?;
-            self.peripheral.discover_services().await?;
         }
+
+        self.peripheral.discover_services().await?;
 
         let service = match self
             .peripheral
@@ -160,6 +161,8 @@ async fn is_control_unit(peripheral: &Peripheral) -> btleplug::Result<bool> {
     }
 }
 
+/// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
+/// Returns the found control unit if any was available, otherwise none on timeout or an error when any error occurs.
 pub async fn discover_first_ble(
     adapter: &Adapter,
     timeout: Duration,
@@ -167,7 +170,6 @@ pub async fn discover_first_ble(
     Ok(discover_first_ble_internal(&adapter, timeout).await?)
 }
 
-/// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
 async fn discover_first_ble_internal(
     adapter: &Adapter,
     timeout: Duration,
@@ -178,16 +180,14 @@ async fn discover_first_ble_internal(
 
     while let Some(event) = events.next().await {
         match event {
-            CentralEvent::DeviceDiscovered(_) => {
-                let peripherals = adapter.peripherals().await?;
-                for peripheral in peripherals {
-                    if is_control_unit(&peripheral).await? {
-                        adapter.stop_scan().await?;
-                        return Ok(Some(ControlUnit::new(BackendBLE::new(peripheral))));
-                    }
+            CentralEvent::DeviceDiscovered(peripheral_id) => {
+                let peripheral = adapter.peripheral(&peripheral_id).await?;
+                if is_control_unit(&peripheral).await? {
+                    adapter.stop_scan().await?;
+                    return Ok(Some(ControlUnit::new(BackendBLE::new(peripheral))));
                 }
             }
-            _ => continue,
+            _ => (),
         }
 
         if start.elapsed() > timeout {
