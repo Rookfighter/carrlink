@@ -1,9 +1,12 @@
 //! Module which implements the core logic to interact with a control unit.
 
+use std::time::Duration;
+
 use super::{messages::*, BackendBLE, Error, Status};
 
 pub struct ControlUnit {
     backend: BackendBLE,
+    timeout: Duration,
 }
 
 fn decode_result_to_error<T>(result: Option<T>) -> Result<T, Error> {
@@ -22,16 +25,25 @@ const BUTTON_CODE: u8 = 8;
 
 impl ControlUnit {
     pub fn new(backend: BackendBLE) -> ControlUnit {
-        ControlUnit { backend: backend }
+        ControlUnit {
+            backend,
+            timeout: Duration::from_secs(2),
+        }
     }
+
+    /// Sets the timeout which is used for control unit communication.
+    pub fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = timeout;
+    }
+
     /// Connects the control unit with the configured backend.
     pub async fn connect(&mut self) -> Result<(), Error> {
-        self.backend.connect().await
+        self.backend.connect(self.timeout).await
     }
 
     /// Disconnects the control unit from the configured backend.
     pub async fn disconnect(&mut self) -> Result<(), Error> {
-        self.backend.disconnect().await
+        self.backend.disconnect(self.timeout).await
     }
 
     /// Determines if the control unti is currently connected.
@@ -42,13 +54,13 @@ impl ControlUnit {
     /// Reads the current status during a race.
     /// The control unit can either return a track status or a lap status object.
     pub async fn get_status(&mut self) -> Result<Status, Error> {
-        let response = self.backend.request(&STATUS_REQUEST).await?;
+        let response = self.backend.request(&STATUS_REQUEST, self.timeout).await?;
         decode_result_to_error(decode_status(&response))
     }
 
     /// Requests the current firmware version of the control unit.
     pub async fn get_version(&mut self) -> Result<String, Error> {
-        let response = self.backend.request(&VERSION_REQUEST).await?;
+        let response = self.backend.request(&VERSION_REQUEST, self.timeout).await?;
         decode_result_to_error(decode_version(&response))
     }
 
@@ -85,21 +97,21 @@ impl ControlUnit {
     /// Simulates a button press with the given button ID.
     async fn press_button(&mut self, button: u8) -> Result<(), Error> {
         let request = make_button_press_request(button);
-        let response = self.backend.request(&request).await?;
+        let response = self.backend.request(&request, self.timeout).await?;
         decode_result_to_error(decode_empty(&request, &response))
     }
 
     /// Resets the positions of the players displayed on the position tower.
     pub async fn reset_positions(&mut self) -> Result<(), Error> {
         let request = make_reset_positions_request();
-        let response = self.backend.request(&request).await?;
+        let response = self.backend.request(&request, self.timeout).await?;
         decode_result_to_error(decode_empty(&request, &response))
     }
 
     /// Resets the clock for all players.
     pub async fn reset_clock(&mut self) -> Result<(), Error> {
         let request = make_reset_clock_request();
-        let response = self.backend.request(&request).await?;
+        let response = self.backend.request(&request, self.timeout).await?;
         decode_result_to_error(decode_empty(&request, &response))
     }
 
@@ -107,7 +119,7 @@ impl ControlUnit {
     /// The speed value will be clamped to [0, 15].
     pub async fn set_speed_level(&mut self, player: usize, speed: usize) -> Result<(), Error> {
         let request = make_set_speed_level_request(player as u8, speed as u8);
-        let response = self.backend.request(&request).await?;
+        let response = self.backend.request(&request, self.timeout).await?;
         decode_result_to_error(decode_empty(&request, &response))
     }
 
@@ -115,7 +127,7 @@ impl ControlUnit {
     /// The brake value will be clamped to [0, 15].
     pub async fn set_brake_level(&mut self, player: usize, brake: usize) -> Result<(), Error> {
         let request = make_set_brake_level_request(player as u8, brake as u8);
-        let response = self.backend.request(&request).await?;
+        let response = self.backend.request(&request, self.timeout).await?;
         decode_result_to_error(decode_empty(&request, &response))
     }
 
@@ -123,19 +135,19 @@ impl ControlUnit {
     /// The fuel value will be clamped to [0, 15].
     pub async fn set_fuel_level(&mut self, player: usize, brake: usize) -> Result<(), Error> {
         let request = make_set_fuel_level_request(player as u8, brake as u8);
-        let response = self.backend.request(&request).await?;
+        let response = self.backend.request(&request, self.timeout).await?;
         decode_result_to_error(decode_empty(&request, &response))
     }
 
     async fn set_lap_low(&mut self, lap: usize) -> Result<(), Error> {
         let request = make_set_lap_low_request((lap as u8) & 0x0F);
-        let response = self.backend.request(&request).await?;
+        let response = self.backend.request(&request, self.timeout).await?;
         decode_result_to_error(decode_empty(&request, &response))
     }
 
     async fn set_lap_high(&mut self, lap: usize) -> Result<(), Error> {
         let request = make_set_lap_high_request((lap as u8) >> 4);
-        let response = self.backend.request(&request).await?;
+        let response = self.backend.request(&request, self.timeout).await?;
         decode_result_to_error(decode_empty(&request, &response))
     }
 

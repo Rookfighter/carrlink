@@ -1,15 +1,16 @@
 //! Defines the general error type of carrlink.
 
 use std::error;
-use std::{fmt, time::Duration};
+use std::fmt;
 
+/// Enumeration of error cases.
 #[derive(Debug)]
 pub enum Error {
     PermissionDenied,
     DeviceNotFound,
     NotConnected,
     NotSupported(String),
-    TimedOut(Duration),
+    TimedOut,
     RuntimeError(String),
     InvalidResponse,
     NoResponse,

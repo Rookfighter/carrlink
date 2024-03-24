@@ -3,9 +3,9 @@
 
 use std::time::{Duration, Instant};
 
-use crate::ControlUnit;
+use crate::{ControlUnit, Error};
 use btleplug::api::{
-    Central as _, CentralEvent, Characteristic, Peripheral as _, ScanFilter, Service, WriteType,
+    Central as _, CentralEvent, Characteristic, Peripheral as _, ScanFilter, WriteType,
 };
 use btleplug::platform::{Adapter, Peripheral};
 use futures::stream::StreamExt;
@@ -23,7 +23,7 @@ impl From<btleplug::Error> for crate::Error {
             btleplug::Error::NotConnected => crate::Error::NotConnected,
             btleplug::Error::Other(contained) => crate::Error::Other(contained),
             btleplug::Error::NotSupported(msg) => crate::Error::NotSupported(msg),
-            btleplug::Error::TimedOut(duration) => crate::Error::TimedOut(duration),
+            btleplug::Error::TimedOut(_) => crate::Error::TimedOut,
             btleplug::Error::RuntimeError(msg) => crate::Error::RuntimeError(msg),
             _ => crate::Error::Other(Box::new(value)),
         }
@@ -40,6 +40,10 @@ pub struct BackendBLE {
     endpoints: Option<EndpointsBLE>,
 }
 
+fn as_timeout_error<E>(_: E) -> Error {
+    Error::TimedOut
+}
+
 impl BackendBLE {
     pub fn new(peripheral: Peripheral) -> BackendBLE {
         BackendBLE {
@@ -48,16 +52,19 @@ impl BackendBLE {
         }
     }
     /// Connects the backend with the configured peripheral.
-    pub async fn connect(&mut self) -> crate::Result<()> {
-        Ok(self.connect_internal().await?)
+    pub async fn connect(&mut self, timeout: Duration) -> crate::Result<()> {
+        let ret = tokio::time::timeout(timeout.clone(), self.connect_internal()).await;
+        Ok(ret.map_err(as_timeout_error)??)
     }
 
-    pub async fn disconnect(&mut self) -> crate::Result<()> {
-        Ok(self.disconnect_internal().await?)
+    pub async fn disconnect(&mut self, timeout: Duration) -> crate::Result<()> {
+        let ret = tokio::time::timeout(timeout.clone(), self.disconnect_internal()).await;
+        Ok(ret.map_err(as_timeout_error)??)
     }
 
-    pub async fn request(&mut self, data: &[u8]) -> crate::Result<Vec<u8>> {
-        Ok(self.request_internal(data).await?)
+    pub async fn request(&mut self, data: &[u8], timeout: Duration) -> crate::Result<Vec<u8>> {
+        let ret = tokio::time::timeout(timeout.clone(), self.request_internal(data)).await;
+        Ok(ret.map_err(as_timeout_error)??)
     }
 
     pub async fn is_connected(&self) -> crate::Result<bool> {
@@ -135,7 +142,7 @@ impl BackendBLE {
                 match notify_stream.next().await {
                     Some(in_data) => {
                         let mut result = in_data.value;
-                        // BLE data is mostly tailed by a $ and they miss the command character
+                        // BLE data is mostly tailored by a $ and they miss the command character
                         // bring this data buffer into a common format
                         if !result.is_empty() && *result.last().unwrap() == b'$' {
                             result.truncate(result.len() - 1);
