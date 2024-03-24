@@ -1,4 +1,4 @@
-use std::time::Duration;
+use crate::LapTime;
 
 use super::StartSignal;
 use super::MAX_CONTROLLER_COUNT;
@@ -132,7 +132,7 @@ fn decode_lap_status(data: &[u8]) -> Option<LapStatus> {
 
     result.controller = ((data[CONTROLLER_OFFSET] & 0x0F) - 1) as usize;
     result.time =
-        Duration::from_millis(decode_uint32(&data[TIME_OFFSET..TIME_OFFSET + UINT32_SIZE]) as u64);
+        LapTime::from_millis(decode_uint32(&data[TIME_OFFSET..TIME_OFFSET + UINT32_SIZE]));
     result.sector = (data[SECTOR_OFFSET] & 0x0F) as usize;
 
     Some(result)

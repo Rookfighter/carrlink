@@ -1,4 +1,4 @@
-use std::time::Duration;
+use crate::LapTime;
 
 /// Status of the lap of a specific controller.
 /// Contains the sector and time of the controller.
@@ -11,8 +11,8 @@ pub struct LapStatus {
     /// Sector of the track where the time was taken.
     pub sector: usize,
 
-    /// Time measurement for the corresponding controller.
-    pub time: Duration,
+    /// Timestamp when the corresponding controller crossed the finish line.
+    pub time: LapTime,
 }
 
 impl LapStatus {
@@ -21,7 +21,7 @@ impl LapStatus {
         LapStatus {
             controller: 0,
             sector: 0,
-            time: Duration::from_secs(0),
+            time: LapTime::from_millis(0),
         }
     }
 }
