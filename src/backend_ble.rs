@@ -52,14 +52,14 @@ impl BackendBLE {
         }
     }
     /// Connects the backend with the configured peripheral.
-    pub async fn connect(&mut self, timeout: Duration) -> crate::Result<()> {
-        let ret = tokio::time::timeout(timeout.clone(), self.connect_internal()).await;
-        Ok(ret.map_err(as_timeout_error)??)
+    pub async fn connect(&mut self) -> crate::Result<()> {
+        self.connect_internal().await?;
+        Ok(())
     }
 
-    pub async fn disconnect(&mut self, timeout: Duration) -> crate::Result<()> {
-        let ret = tokio::time::timeout(timeout.clone(), self.disconnect_internal()).await;
-        Ok(ret.map_err(as_timeout_error)??)
+    pub async fn disconnect(&mut self) -> crate::Result<()> {
+        self.disconnect_internal().await?;
+        Ok(())
     }
 
     pub async fn request(&mut self, data: &[u8], timeout: Duration) -> crate::Result<Vec<u8>> {
@@ -182,7 +182,11 @@ async fn discover_first_ble_internal(
     timeout: Duration,
 ) -> btleplug::Result<Option<ControlUnit>> {
     let start = Instant::now();
-    adapter.start_scan(ScanFilter::default()).await?;
+    adapter
+        .start_scan(ScanFilter {
+            services: vec![SERVICE_UUID],
+        })
+        .await?;
     let mut events = adapter.events().await?;
 
     while let Some(event) = events.next().await {

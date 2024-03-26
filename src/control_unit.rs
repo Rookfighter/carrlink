@@ -38,12 +38,12 @@ impl ControlUnit {
 
     /// Connects the control unit with the configured backend.
     pub async fn connect(&mut self) -> Result<(), Error> {
-        self.backend.connect(self.timeout).await
+        self.backend.connect().await
     }
 
     /// Disconnects the control unit from the configured backend.
     pub async fn disconnect(&mut self) -> Result<(), Error> {
-        self.backend.disconnect(self.timeout).await
+        self.backend.disconnect().await
     }
 
     /// Determines if the control unti is currently connected.
