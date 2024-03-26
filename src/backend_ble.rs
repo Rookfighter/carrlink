@@ -168,27 +168,8 @@ async fn is_control_unit(peripheral: &Peripheral) -> btleplug::Result<bool> {
     }
 }
 
-/// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
-/// Returns the found control unit if any was available, otherwise none on timeout or an error when any error occurs.
-pub async fn discover_first_ble(
-    adapter: &Adapter,
-    timeout: Duration,
-) -> crate::Result<Option<ControlUnit>> {
-    Ok(discover_first_ble_internal(&adapter, timeout).await?)
-}
-
-async fn discover_first_ble_internal(
-    adapter: &Adapter,
-    timeout: Duration,
-) -> btleplug::Result<Option<ControlUnit>> {
-    let start = Instant::now();
-    adapter
-        .start_scan(ScanFilter {
-            services: vec![SERVICE_UUID],
-        })
-        .await?;
+async fn wait_for_control_unit(adapter: &Adapter) -> btleplug::Result<Option<ControlUnit>> {
     let mut events = adapter.events().await?;
-
     while let Some(event) = events.next().await {
         match event {
             CentralEvent::DeviceDiscovered(peripheral_id) => {
@@ -200,12 +181,34 @@ async fn discover_first_ble_internal(
             }
             _ => (),
         }
-
-        if start.elapsed() > timeout {
-            break;
-        }
     }
 
-    adapter.stop_scan().await?;
     Ok(None)
+}
+
+async fn discover_first_ble_internal(
+    adapter: &Adapter,
+    timeout: Duration,
+) -> btleplug::Result<Option<ControlUnit>> {
+    adapter
+        .start_scan(ScanFilter {
+            services: vec![SERVICE_UUID],
+        })
+        .await?;
+
+    let ret = tokio::time::timeout(timeout, wait_for_control_unit(adapter))
+        .await
+        .map_err(|_| btleplug::Error::TimedOut(timeout));
+
+    adapter.stop_scan().await?;
+    ret?
+}
+
+/// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
+/// Returns the found control unit if any was available, otherwise none on timeout or an error when any error occurs.
+pub async fn discover_first_ble(
+    adapter: &Adapter,
+    timeout: Duration,
+) -> crate::Result<Option<ControlUnit>> {
+    Ok(discover_first_ble_internal(&adapter, timeout).await?)
 }
