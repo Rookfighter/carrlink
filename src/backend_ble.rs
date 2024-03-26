@@ -175,7 +175,6 @@ async fn wait_for_control_unit(adapter: &Adapter) -> btleplug::Result<Option<Con
             CentralEvent::DeviceDiscovered(peripheral_id) => {
                 let peripheral = adapter.peripheral(&peripheral_id).await?;
                 if is_control_unit(&peripheral).await? {
-                    adapter.stop_scan().await?;
                     return Ok(Some(ControlUnit::new(BackendBLE::new(peripheral))));
                 }
             }
@@ -190,11 +189,7 @@ async fn discover_first_ble_internal(
     adapter: &Adapter,
     timeout: Duration,
 ) -> btleplug::Result<Option<ControlUnit>> {
-    adapter
-        .start_scan(ScanFilter {
-            services: vec![SERVICE_UUID],
-        })
-        .await?;
+    adapter.start_scan(ScanFilter::default()).await?;
 
     let ret = tokio::time::timeout(timeout, wait_for_control_unit(adapter))
         .await
