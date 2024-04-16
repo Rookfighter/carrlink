@@ -4,7 +4,7 @@ use btleplug::{
     api::{Central as _, Manager as _},
     platform::{Adapter, Manager},
 };
-use carrlink::ControlUnit;
+use carrlink::{BackendBLE, ControlUnit};
 use tokio;
 
 async fn find_adapter() -> btleplug::Result<Adapter> {
@@ -16,7 +16,7 @@ async fn find_adapter() -> btleplug::Result<Adapter> {
     }
 }
 
-async fn find_control_unit(adapter: Adapter) -> carrlink::Result<ControlUnit> {
+async fn find_control_unit(adapter: Adapter) -> carrlink::Result<ControlUnit<BackendBLE>> {
     loop {
         match carrlink::discover_first_ble(&adapter, Duration::from_secs(5)).await? {
             Some(control_unit) => return Ok(control_unit),
@@ -49,6 +49,4 @@ async fn main() -> io::Result<()> {
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-
-    Ok(())
 }

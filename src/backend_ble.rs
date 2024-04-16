@@ -1,9 +1,10 @@
 //! Module which implements a bluetooth low energy backend with routines for
 //! connecting, disconnecting and sending requests.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use crate::{ControlUnit, Error};
+use crate::{Backend, ControlUnit, Error};
+use async_trait::async_trait;
 use btleplug::api::{
     Central as _, CentralEvent, Characteristic, Peripheral as _, ScanFilter, WriteType,
 };
@@ -35,6 +36,7 @@ struct EndpointsBLE {
     output_char: Characteristic,
 }
 
+/// Backend which manages a bluetooth connection with the control unit.
 pub struct BackendBLE {
     peripheral: Peripheral,
     endpoints: Option<EndpointsBLE>,
@@ -50,25 +52,6 @@ impl BackendBLE {
             peripheral,
             endpoints: None,
         }
-    }
-    /// Connects the backend with the configured peripheral.
-    pub async fn connect(&mut self) -> crate::Result<()> {
-        self.connect_internal().await?;
-        Ok(())
-    }
-
-    pub async fn disconnect(&mut self) -> crate::Result<()> {
-        self.disconnect_internal().await?;
-        Ok(())
-    }
-
-    pub async fn request(&mut self, data: &[u8], timeout: Duration) -> crate::Result<Vec<u8>> {
-        let ret = tokio::time::timeout(timeout.clone(), self.request_internal(data)).await;
-        Ok(ret.map_err(as_timeout_error)??)
-    }
-
-    pub async fn is_connected(&self) -> crate::Result<bool> {
-        Ok(self.peripheral.is_connected().await? && self.endpoints.is_some())
     }
 
     async fn connect_internal(&mut self) -> btleplug::Result<()> {
@@ -158,17 +141,56 @@ impl BackendBLE {
     }
 }
 
-async fn is_control_unit(peripheral: &Peripheral) -> btleplug::Result<bool> {
-    match peripheral.properties().await? {
-        Some(properties) => match properties.local_name {
-            Some(name) => Ok(name == "Control_Unit"),
-            None => Ok(false),
-        },
-        None => Ok(false),
+#[async_trait]
+impl Backend for BackendBLE {
+    /// Connects the backend with the configured peripheral.
+    async fn connect(&mut self) -> crate::Result<()> {
+        self.connect_internal().await?;
+        Ok(())
+    }
+
+    /// Disconnects the backend from the configured peripheral.
+    async fn disconnect(&mut self) -> crate::Result<()> {
+        self.disconnect_internal().await?;
+        Ok(())
+    }
+
+    async fn request(&mut self, data: &[u8], timeout: Duration) -> crate::Result<Vec<u8>> {
+        let ret = tokio::time::timeout(timeout.clone(), self.request_internal(data)).await;
+        Ok(ret.map_err(as_timeout_error)??)
+    }
+
+    async fn is_connected(&self) -> crate::Result<bool> {
+        Ok(self.peripheral.is_connected().await? && self.endpoints.is_some())
     }
 }
 
-async fn wait_for_control_unit(adapter: &Adapter) -> btleplug::Result<Option<ControlUnit>> {
+/// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
+/// Returns the found control unit if any was available, otherwise none on timeout or an error when any error occurs.
+pub async fn discover_first_ble(
+    adapter: &Adapter,
+    timeout: Duration,
+) -> crate::Result<Option<ControlUnit<BackendBLE>>> {
+    Ok(discover_first_ble_internal(&adapter, timeout).await?)
+}
+
+async fn discover_first_ble_internal(
+    adapter: &Adapter,
+    timeout: Duration,
+) -> btleplug::Result<Option<ControlUnit<BackendBLE>>> {
+    adapter.start_scan(ScanFilter::default()).await?;
+
+    let ret = tokio::time::timeout(timeout, wait_for_control_unit(adapter))
+        .await
+        .map_err(|_| btleplug::Error::TimedOut(timeout));
+
+    adapter.stop_scan().await?;
+    ret?
+}
+
+async fn wait_for_control_unit(
+    adapter: &Adapter,
+) -> btleplug::Result<Option<ControlUnit<BackendBLE>>> {
     let mut events = adapter.events().await?;
     while let Some(event) = events.next().await {
         match event {
@@ -185,25 +207,12 @@ async fn wait_for_control_unit(adapter: &Adapter) -> btleplug::Result<Option<Con
     Ok(None)
 }
 
-async fn discover_first_ble_internal(
-    adapter: &Adapter,
-    timeout: Duration,
-) -> btleplug::Result<Option<ControlUnit>> {
-    adapter.start_scan(ScanFilter::default()).await?;
-
-    let ret = tokio::time::timeout(timeout, wait_for_control_unit(adapter))
-        .await
-        .map_err(|_| btleplug::Error::TimedOut(timeout));
-
-    adapter.stop_scan().await?;
-    ret?
-}
-
-/// Searches for a control unit bluetooth device in the range of the given adapter and returns the first instance.
-/// Returns the found control unit if any was available, otherwise none on timeout or an error when any error occurs.
-pub async fn discover_first_ble(
-    adapter: &Adapter,
-    timeout: Duration,
-) -> crate::Result<Option<ControlUnit>> {
-    Ok(discover_first_ble_internal(&adapter, timeout).await?)
+async fn is_control_unit(peripheral: &Peripheral) -> btleplug::Result<bool> {
+    match peripheral.properties().await? {
+        Some(properties) => match properties.local_name {
+            Some(name) => Ok(name == "Control_Unit"),
+            None => Ok(false),
+        },
+        None => Ok(false),
+    }
 }

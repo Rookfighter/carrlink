@@ -1,11 +1,11 @@
 //! Module which implements the core logic to interact with a control unit.
 
+use super::{messages::*, Error, Status};
+use crate::Backend;
 use std::time::Duration;
 
-use super::{messages::*, BackendBLE, Error, Status};
-
-pub struct ControlUnit {
-    backend: BackendBLE,
+pub struct ControlUnit<T: Backend> {
+    backend: T,
     timeout: Duration,
 }
 
@@ -23,8 +23,8 @@ const BUTTON_BRAKE: u8 = 6;
 const BUTTON_FUEL: u8 = 7;
 const BUTTON_CODE: u8 = 8;
 
-impl ControlUnit {
-    pub fn new(backend: BackendBLE) -> ControlUnit {
+impl<T: Backend> ControlUnit<T> {
+    pub fn new(backend: T) -> ControlUnit<T> {
         ControlUnit {
             backend,
             timeout: Duration::from_secs(2),
