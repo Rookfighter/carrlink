@@ -78,4 +78,4 @@ Toys GmbH.
 `carrlink` is not an official Carrera® product, and is not
 affiliated with or endorsed by Carrera Toys GmbH.
 
-`carrlink` took inspiration from the Python library `[carreralib](https://github.com/tkem/carreralib)`.
+`carrlink` took inspiration from the Python library [`carreralib`](https://github.com/tkem/carreralib).
